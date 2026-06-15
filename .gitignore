@@ -30,3 +30,7 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+
+
+# Keys
+*.txt
