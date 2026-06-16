@@ -156,7 +156,7 @@ def chunk_text(
     chunks = []
 
     for i in range(0, len(words), chunk_size - overlap):
-        chunk = " ".join(words[i : i + chunk_size])
+        chunk = " ".join(words[i: i + chunk_size])
         if chunk.strip():
             chunks.append(chunk)
 
@@ -172,7 +172,7 @@ def get_embeddings(texts: list[str], api_key: str) -> np.ndarray:
     batch_size = 100
 
     for i in range(0, len(texts), batch_size):
-        batch = texts[i : i + batch_size]
+        batch = texts[i: i + batch_size]
         response = client.embeddings.create(model=EMBEDDING_MODEL, input=batch)
         embeddings = [item.embedding for item in response.data]
         all_embeddings.extend(embeddings)
@@ -210,7 +210,7 @@ def generate_answer(query: str, context_chunks: list[str], api_key: str) -> str:
     context = "\n\n---\n\n".join(context_chunks)
 
     system_prompt = """You are a helpful assistant that answers questions based on the provided context.
-    
+
 Rules:
 - Answer ONLY based on the context provided
 - If the context doesn't contain relevant information, say "I couldn't find relevant information in the documents."
@@ -276,12 +276,12 @@ def main():
             st.markdown(
                 """
             **Setup required:**
-            
+
             Create `.streamlit/secrets.toml`:
             ```toml
             OPENAI_API_KEY = "sk-your-key-here"
             ```
-            
+
             Or set environment variable:
             ```bash
             export OPENAI_API_KEY="sk-your-key"
@@ -427,13 +427,13 @@ def main():
             st.markdown(
                 """
             **RAG (Retrieval-Augmented Generation) Process:**
-            
+
             1. **Upload** — Add your documents (PDF, Word, Excel, CSV, Text, HTML)
             2. **Process** — Documents are split into chunks and converted to embeddings
             3. **Index** — Embeddings are stored in a FAISS vector index
             4. **Query** — Your questions are matched against the document chunks
             5. **Generate** — Relevant chunks are sent to GPT to generate accurate answers
-            
+
             **Supported document types:**
             - 📄 PDF documents
             - 📝 Word documents (.docx)
