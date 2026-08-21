@@ -154,8 +154,9 @@ def chunk_text(
     """Split text into overlapping chunks."""
     words = text.split()
     chunks = []
+    step = max(1, chunk_size - overlap)
 
-    for i in range(0, len(words), chunk_size - overlap):
+    for i in range(0, len(words), step):
         chunk = " ".join(words[i: i + chunk_size])
         if chunk.strip():
             chunks.append(chunk)
@@ -199,7 +200,7 @@ def search_similar(
     query_embedding = get_embeddings([query], api_key)
     distances, indices = index.search(query_embedding, top_k)
 
-    results = [chunks[i] for i in indices[0] if i < len(chunks)]
+    results = [chunks[i] for i in indices[0] if 0 <= i < len(chunks)]
     return results
 
 
