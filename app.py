@@ -404,7 +404,6 @@ def main():
                         st.session_state.index = index
                         st.session_state.documents_loaded = True
                         st.session_state.doc_stats = doc_stats
-                        st.session_state.top_k = top_k
 
                         st.success(f"✅ Processed {len(chunks)} chunks!")
 
@@ -494,9 +493,6 @@ def main():
         with st.chat_message("assistant"):
             with st.spinner("Searching and generating answer..."):
                 try:
-                    # Get top_k from session or default
-                    top_k = st.session_state.get("top_k", 3)
-
                     # Search for relevant chunks
                     relevant_chunks = search_similar(
                         query,
