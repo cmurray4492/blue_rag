@@ -19,11 +19,20 @@ There are no build steps, tests, or lint configs in this repo — it's a single 
 
 ## Configuration
 
-The app requires an OpenAI API key, resolved in `get_api_key()` (app.py) in this order:
-1. `st.secrets["OPENAI_API_KEY"]` — from `.streamlit/secrets.toml` (gitignored; create locally as `OPENAI_API_KEY = "sk-..."`)
-2. `OPENAI_API_KEY` environment variable
+Config values are resolved by `get_secret()` (app.py): `st.secrets[name]` from `.streamlit/secrets.toml` (gitignored) first, then the environment variable of the same name. It catches `StreamlitSecretNotFoundError`, since `st.secrets` raises when no secrets.toml exists.
 
-Without a key, the UI shows setup instructions and disables document processing.
+- `OPENAI_API_KEY` (required) — without it, the UI shows setup instructions and disables document processing.
+- `APP_PASSWORD` (optional) — when set, `check_password()` gates the whole app behind a password prompt. Unset locally = no gate.
+
+## Deployment (Railway)
+
+Live at https://blue-rag-production.up.railway.app (Railway project `blue-rag`, service `blue-rag`, environment `production`).
+
+- **Auto-deploys from GitHub**: the service is connected to `cmurray4492/blue_rag` branch `main`; every push to `main` rebuilds and redeploys. Don't use `railway up` — it deploys local files instead of what's on GitHub.
+- **Builder**: Railpack, installing from `requirements.txt`. Python version is pinned by `.python-version` (3.13).
+- **Start command**: set via the Railway variable `RAILPACK_START_CMD` (`streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true`). Railpack doesn't detect Streamlit and falls back to `python app.py`; a `railway.json` `startCommand` was ignored when deploying via `railway up`, so the variable is the source of truth.
+- **Secrets**: `OPENAI_API_KEY` and `APP_PASSWORD` are Railway service variables (`railway variable list` / `railway variable set KEY --stdin`), never committed.
+- **Checking a deploy**: `railway deployment list --json` (status + commit hash), `railway logs`, and `curl https://blue-rag-production.up.railway.app/_stcore/health`.
 
 ## Architecture
 
