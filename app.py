@@ -1,10 +1,12 @@
 # Core dependencies
+import hmac
+import os
+
 import streamlit as st
+from streamlit.errors import StreamlitSecretNotFoundError
 import openai
 import numpy as np
 import faiss
-from pathlib import Path
-from io import BytesIO
 
 # Document processing imports
 from pypdf import PdfReader
@@ -23,19 +25,33 @@ CHUNK_OVERLAP = 50
 SUPPORTED_TYPES = ["txt", "md", "pdf", "docx", "csv", "xlsx", "html"]
 
 
+def get_secret(name: str) -> str | None:
+    """Get a value from secrets.toml, falling back to the environment."""
+    # st.secrets raises if no secrets.toml exists (e.g. on Railway)
+    try:
+        return st.secrets[name]
+    except (StreamlitSecretNotFoundError, KeyError):
+        return os.getenv(name) or None
+
+
 def get_api_key() -> str | None:
     """Get API key from secrets.toml or environment."""
-    # Try Streamlit secrets first
-    if "OPENAI_API_KEY" in st.secrets:
-        return st.secrets["OPENAI_API_KEY"]
+    return get_secret("OPENAI_API_KEY")
 
-    # Fallback to environment variable
-    import os
 
-    if os.getenv("OPENAI_API_KEY"):
-        return os.getenv("OPENAI_API_KEY")
+def check_password() -> bool:
+    """Gate the app behind APP_PASSWORD when it is set."""
+    password = get_secret("APP_PASSWORD")
+    if not password or st.session_state.get("authenticated"):
+        return True
 
-    return None
+    entered = st.text_input("Password", type="password")
+    if entered:
+        if hmac.compare_digest(entered, password):
+            st.session_state.authenticated = True
+            st.rerun()
+        st.error("Incorrect password")
+    return False
 
 
 # ============== Document Readers ==============
@@ -154,7 +170,7 @@ def chunk_text(
     """Split text into overlapping chunks."""
     words = text.split()
     chunks = []
-    step = max(1, chunk_size - overlap)
+    step = chunk_size - overlap if overlap < chunk_size else chunk_size
 
     for i in range(0, len(words), step):
         chunk = " ".join(words[i: i + chunk_size])
@@ -247,6 +263,9 @@ Answer:"""
 def main():
     st.set_page_config(page_title="RAG Q&A System", page_icon="📚", layout="wide")
 
+    if not check_password():
+        st.stop()
+
     st.title("📚 RAG Document Q&A System")
     st.markdown("*Upload documents, ask questions, get AI-powered answers*")
 
@@ -328,7 +347,11 @@ def main():
         with st.expander("Advanced Settings"):
             chunk_size = st.slider("Chunk size (words)", 100, 1000, CHUNK_SIZE, 50)
             chunk_overlap = st.slider(
-                "Chunk overlap (words)", 0, 200, CHUNK_OVERLAP, 10
+                "Chunk overlap (words)",
+                0,
+                min(200, chunk_size - 50),
+                min(CHUNK_OVERLAP, chunk_size - 50),
+                10,
             )
             top_k = st.slider("Results to retrieve", 1, 10, 3)
 
@@ -373,11 +396,12 @@ def main():
                     try:
                         # Chunk the text
                         chunks = chunk_text(all_text, chunk_size, chunk_overlap)
-                        st.session_state.chunks = chunks
 
-                        # Create embeddings and index
+                        # Create embeddings and index; only commit both once built
                         embeddings = get_embeddings(chunks, api_key)
-                        st.session_state.index = create_faiss_index(embeddings)
+                        index = create_faiss_index(embeddings)
+                        st.session_state.chunks = chunks
+                        st.session_state.index = index
                         st.session_state.documents_loaded = True
                         st.session_state.doc_stats = doc_stats
                         st.session_state.top_k = top_k
