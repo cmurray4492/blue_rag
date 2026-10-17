@@ -15,7 +15,7 @@ streamlit run app.py
 
 The app runs at `http://localhost:8501`. In the devcontainer/Codespaces environment, `postAttachCommand` runs this automatically (with CORS/XSRF disabled for the forwarded port).
 
-There are no build steps, tests, or lint configs in this repo — it's a single Python file with no test suite.
+There are no build steps, tests, or lint configs in this repo — it's a single Python file with no test suite. `requirements.txt` holds runtime deps only (it's what Railway installs); dev tools (black, flake8, isort, autopep8) are in `requirements-dev.txt`.
 
 ## Configuration
 

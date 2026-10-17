@@ -22,7 +22,7 @@ CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 
 # Supported file types
-SUPPORTED_TYPES = ["txt", "md", "pdf", "docx", "csv", "xlsx", "html"]
+SUPPORTED_TYPES = ["txt", "md", "pdf", "docx", "csv", "xlsx", "html", "htm"]
 
 
 def get_secret(name: str) -> str | None:
@@ -59,7 +59,12 @@ def check_password() -> bool:
 
 def read_txt(file) -> str:
     """Read plain text or markdown file."""
-    return file.read().decode("utf-8")
+    raw = file.read()
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        # Common for files saved on Windows
+        return raw.decode("cp1252", errors="replace")
 
 
 def read_pdf(file) -> str:
@@ -180,9 +185,11 @@ def chunk_text(
     return chunks
 
 
-def get_embeddings(texts: list[str], api_key: str) -> np.ndarray:
-    """Get embeddings from OpenAI API."""
-    client = openai.OpenAI(api_key=api_key)
+@st.cache_data(show_spinner=False, max_entries=50)
+def get_embeddings(texts: list[str], _api_key: str) -> np.ndarray:
+    """Get embeddings from OpenAI API (cached, so reprocessing is free)."""
+    # Leading underscore keeps the key out of the cache hash
+    client = openai.OpenAI(api_key=_api_key)
 
     # Process in batches of 100 (API limit)
     all_embeddings = []
@@ -260,6 +267,15 @@ Answer:"""
 # ============== Streamlit UI ==============
 
 
+def show_sources(sources: list[str]):
+    """Show retrieved chunks as plain text (document content isn't rendered as markdown)."""
+    with st.expander("📎 Sources"):
+        for i, source in enumerate(sources, 1):
+            st.markdown(f"**Chunk {i}:**")
+            display_text = source[:500] + "..." if len(source) > 500 else source
+            st.code(display_text, language=None, wrap_lines=True)
+
+
 def main():
     st.set_page_config(page_title="RAG Q&A System", page_icon="📚", layout="wide")
 
@@ -316,19 +332,7 @@ def main():
 
         # Show supported formats
         with st.expander("Supported Formats"):
-            st.markdown(
-                """
-            | Format | Extension |
-            |--------|-----------|
-            | Plain Text | `.txt` |
-            | Markdown | `.md` |
-            | PDF | `.pdf` |
-            | Word | `.docx` |
-            | CSV | `.csv` |
-            | Excel | `.xlsx` |
-            | HTML | `.html` |
-            """
-            )
+            st.markdown(" ".join(f"`.{ext}`" for ext in SUPPORTED_TYPES))
 
         # File upload
         uploaded_files = st.file_uploader(
@@ -472,14 +476,8 @@ def main():
     for msg in st.session_state.chat_history:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
-            if "sources" in msg and msg["sources"]:
-                with st.expander("📎 Sources"):
-                    for i, source in enumerate(msg["sources"], 1):
-                        st.markdown(f"**Chunk {i}:**")
-                        display_text = (
-                            source[:500] + "..." if len(source) > 500 else source
-                        )
-                        st.markdown(f"> {display_text}")
+            if msg.get("sources"):
+                show_sources(msg["sources"])
 
     # Chat input
     if query := st.chat_input("Ask a question about your documents..."):
@@ -507,14 +505,7 @@ def main():
 
                     st.markdown(answer)
 
-                    # Show sources
-                    with st.expander("📎 Sources"):
-                        for i, source in enumerate(relevant_chunks, 1):
-                            st.markdown(f"**Chunk {i}:**")
-                            display_text = (
-                                source[:500] + "..." if len(source) > 500 else source
-                            )
-                            st.markdown(f"> {display_text}")
+                    show_sources(relevant_chunks)
 
                     # Save to history
                     st.session_state.chat_history.append(
