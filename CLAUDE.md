@@ -49,4 +49,4 @@ Everything lives in `app.py`, organized into three sections:
 
 Model names and chunk defaults are top-of-file constants (`EMBEDDING_MODEL`, `CHAT_MODEL`, `CHUNK_SIZE`, `CHUNK_OVERLAP`, `SUPPORTED_TYPES`) — change behavior there rather than inline.
 
-Since the FAISS index and chunks are rebuilt from scratch on every "Process Documents" click (not incrementally updated), adding a new document type means: write a `read_<type>` function returning extracted text, add a branch in `read_file`, and add the extension to `SUPPORTED_TYPES`.
+Each document is chunked and embedded separately, and `get_embeddings` is wrapped in `st.cache_data` (the `_api_key` param is excluded from the hash), so re-processing only calls the API for new or changed files. The FAISS index itself is still rebuilt from scratch on every "Process Documents" click, so adding a new document type means: write a `read_<type>` function returning extracted text, add a branch in `read_file`, and add the extension to `SUPPORTED_TYPES`.

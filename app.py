@@ -361,7 +361,9 @@ def main():
 
         # Process button
         if st.button("🔄 Process Documents", type="primary", disabled=not api_key):
-            all_text = ""
+            # One text per document, chunked and embedded separately so the
+            # embedding cache is per file (adding a file only embeds that file)
+            documents = []
             doc_stats = []
 
             # Process uploaded files
@@ -372,7 +374,7 @@ def main():
                     try:
                         content, file_type = read_file(file)
                         word_count = len(content.split())
-                        all_text += f"\n\n--- Document: {file.name} ---\n\n{content}"
+                        documents.append(f"--- Document: {file.name} ---\n\n{content}")
                         doc_stats.append(
                             {"name": file.name, "type": file_type, "words": word_count}
                         )
@@ -386,7 +388,7 @@ def main():
 
             # Add pasted text
             if pasted_text.strip():
-                all_text += f"\n\n--- Pasted Text ---\n\n{pasted_text}"
+                documents.append(f"--- Pasted Text ---\n\n{pasted_text}")
                 doc_stats.append(
                     {
                         "name": "Pasted text",
@@ -395,15 +397,18 @@ def main():
                     }
                 )
 
-            if all_text.strip():
+            if documents:
                 with st.spinner("Creating embeddings and index..."):
                     try:
-                        # Chunk the text
-                        chunks = chunk_text(all_text, chunk_size, chunk_overlap)
+                        chunks = []
+                        doc_embeddings = []
+                        for doc in documents:
+                            doc_chunks = chunk_text(doc, chunk_size, chunk_overlap)
+                            chunks.extend(doc_chunks)
+                            doc_embeddings.append(get_embeddings(doc_chunks, api_key))
 
-                        # Create embeddings and index; only commit both once built
-                        embeddings = get_embeddings(chunks, api_key)
-                        index = create_faiss_index(embeddings)
+                        # Build the index; only commit chunks and index once both exist
+                        index = create_faiss_index(np.vstack(doc_embeddings))
                         st.session_state.chunks = chunks
                         st.session_state.index = index
                         st.session_state.documents_loaded = True
